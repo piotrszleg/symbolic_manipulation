@@ -63,8 +63,9 @@ class Binary(Expression):
         right_paths[self.right]=[self.right]
         for left_path in left_paths.items():
             for right_path in right_paths.items():
-                key=self.__class__(left_path[0], right_path[0])
-                paths[key]=self.prepend_each_path_element(left_path[1], right_path[1])
+                if not(left_path[0]==self.left and right_path[0]==self.right):
+                    key=self.__class__(left_path[0], right_path[0])
+                    paths[key]=self.prepend_each_path_element(left_path[1], right_path[1])
         paths.update(super().simplify(axioms, max_depth))
         return paths
 
@@ -141,7 +142,7 @@ axioms=[
 ]
 
 # tested=Not(Not(Symbol("x")))
-tested=Or(Not(Not(Symbol("a"))), Symbol("b"))
+tested=Or(Not(Not(Symbol("a"))), Not(Not(Symbol("b"))))
 print(tested)
 for path in tested.simplify(axioms).values():
     for formula in path:
