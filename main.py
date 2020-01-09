@@ -37,7 +37,7 @@ class Binary(Expression):
         self.right=right
 
     def matches(self, other):
-        return isinstance(other, Or) and self.left.matches(other.left) and self.right.matches(other.right)
+        return isinstance(other, self.__class__) and self.left.matches(other.left) and self.right.matches(other.right)
 
     def __repr__(self):
         return "({} {} {})".format(self.left, self.operator, self.right)
@@ -77,15 +77,16 @@ class And(Binary):
     def __init__(self, left, right):
         super().__init__("&&", left, right)
 
-class Not(Expression):
-    def __init__(self, right):
+class Prefix(Expression):
+    def __init__(self, operator, right):
+        self.operator=operator
         self.right=right
 
     def matches(self, other):
-        return isinstance(other, Not) and self.right.matches(other.right)
+        return isinstance(other, self.__class__) and self.right.matches(other.right)
 
     def __repr__(self):
-        return "!"+str(self.right)
+        return f"{self.operator}{self.right}"
 
     def cost(self):
         return 1+self.right.cost()
@@ -105,12 +106,32 @@ class Not(Expression):
         paths.update(super().simplify(axioms, max_depth))
         return paths
 
+class Not(Prefix):
+    def __init__(self, right):
+        super().__init__("!", right)
+
 class Symbol(Expression):
     def __init__(self, name):
         self.name=name
 
+    def matches(self, other):
+        return isinstance(other, self.__class__) and self.name==other.name
+    
     def __repr__(self):
         return self.name
+
+    def cost(self):
+        return 1
+
+class Constant(Expression):
+    def __init__(self, value):
+        self.value=value
+
+    def matches(self, other):
+        return isinstance(other, self.__class__) and self.value==other.value
+
+    def __repr__(self):
+        return repr(self.value)
 
     def cost(self):
         return 1
@@ -142,7 +163,7 @@ axioms=[
 ]
 
 # tested=Not(Not(Symbol("x")))
-tested=Or(Not(Not(Symbol("a"))), Not(Not(Symbol("b"))))
+tested=Or(Not(Not(Constant(True))), Not(Not(Symbol("b"))))
 print(tested)
 for path in tested.simplify(axioms).values():
     for formula in path:
