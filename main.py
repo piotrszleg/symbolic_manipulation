@@ -1,5 +1,4 @@
-import pprint
-import itertools
+from itertools import zip_longest
 from blist import sorteddict
 from dataclasses import dataclass, field
 
@@ -59,7 +58,7 @@ class Binary(Expression):
             fill=left_path[-1]
         else:
             fill=right_path[-1]
-        for (left_element, right_element) in itertools.zip_longest(left_path, right_path, fillvalue=fill):
+        for (left_element, right_element) in zip_longest(left_path, right_path, fillvalue=fill):
             result.append(self.__class__(left_element, right_element))
         return result
 
