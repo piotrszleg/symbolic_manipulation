@@ -8,7 +8,7 @@ class Expression:
     def cost(self):
         return 1
     def __lt__(self, other):
-        return self.cost()-other.cost()
+        return self.cost()>other.cost()
 
     def possible_transformations(self, transformations):
         for transformation in transformations:
@@ -73,12 +73,13 @@ class Binary(Expression):
         right_paths=sorteddict()
         self.right.simplify_recursive(transformations, [self.right], right_paths, depth, max_depth)
         right_paths[self.right]=[self.right]
-        for (left_transfromed, left_path) in left_paths.items():
+        for (left_transformed, left_path) in left_paths.items():
             for (right_transformed, right_path) in right_paths.items():
-                if not(left_transfromed==self.left and right_transformed==self.right):
-                    key=self.__class__(left_transfromed, right_transformed)
+                if not(left_transformed==self.left and right_transformed==self.right):
+                    key=self.__class__(left_transformed, right_transformed)
                     paths[key]=path[:-1]+self.prepend_each_path_element(left_path, right_path)
-        super().simplify_recursive(transformations, path, paths, depth, max_depth)
+                    key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
+        super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
 
     def replace_variables(self, variables):
         return self.__class__(self.left.replace_variables(variables), self.right.replace_variables(variables))
@@ -111,14 +112,14 @@ class Prefix(Expression):
             result.append(self.__class__(right_element))
         return result
 
-    def simplify(self, transformations, max_depth=10):
-        paths=sorteddict()
-        right_paths=self.right.simplify(transformations, max_depth)
-        for right_path in right_paths.items():
-            key=self.__class__(right_path[0])
-            paths[key]=self.prepend_each_path_element(right_path[1])
-        paths.update(super().simplify(transformations, max_depth))
-        return paths
+    def simplify_recursive(self, transformations, path, paths, depth, max_depth):
+        right_paths=sorteddict()
+        self.right.simplify_recursive(transformations, [self.right], right_paths, depth, max_depth)
+        for (right_transformed, right_path) in right_paths.items():
+            key=self.__class__(right_transformed)
+            paths[key]=path[:-1]+self.prepend_each_path_element(right_path)
+            key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
+        super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
 
     def replace_variables(self, variables):
         return self.__class__(self.right.replace_variables(variables))
@@ -137,12 +138,6 @@ class Symbol(Expression):
     def __repr__(self):
         return self.name
 
-    def cost(self):
-        return 1
-
-    def replace_variables(self, variables):
-        return self
-
 @dataclass(frozen=True)
 class Constant(Expression):
     value:object
@@ -152,12 +147,6 @@ class Constant(Expression):
 
     def __repr__(self):
         return repr(self.value)
-
-    def cost(self):
-        return 1
-
-    def replace_variables(self, variables):
-        return self
 
 @dataclass(frozen=True)
 class Variable(Expression):
@@ -181,9 +170,6 @@ class Variable(Expression):
 
     def __repr__(self):
         return "$"+repr(self.identifier)
-
-    def cost(self):
-        return 1
 
 def DeMorgan1(expression):
     return And(Not(expression.right.left), Not(expression.right.right))
@@ -213,8 +199,8 @@ class Transformation:
 
 transformations=[
     Transformation(Not(Not(Variable(1))), Variable(1)),
-    Transformation(Not(Or(Variable(1), Variable(2))), And(Not(Variable(1)), Variable(2))),
-    Transformation(Not(And(Variable(1), Variable(2))), Or(Not(Variable(1)), Variable(2))),
+    Transformation(Not(Or(Variable(1), Variable(2))), And(Not(Variable(1)), Not(Variable(2)))),
+    Transformation(Not(And(Variable(1), Variable(2))), Or(Not(Variable(1)), Not(Variable(2)))),
     Transformation(And(Variable(1), Variable(1)), Variable(1)),
     Transformation(Or(Variable(1), Variable(1)), Variable(1)),
     Transformation(Not(Constant(True)), Constant(False)),
@@ -226,5 +212,5 @@ tested=Not(Not(Not(And(Constant(True), Constant(True)))))
 print("Input")
 print(tested)
 print("Possible transformations")
-for path in reversed(tested.simplify(transformations).values()):
-    print("\t-> ".join(map(str, path)))
+for path in tested.simplify(transformations).values():
+    print(" -> ".join(map(str, path)))
