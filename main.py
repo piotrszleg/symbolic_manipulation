@@ -34,7 +34,7 @@ class Expression:
     def visit(self, fn):
         fn(self)
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Binary(Expression):
     operator:str
     left:Expression
@@ -90,7 +90,7 @@ class And(Binary):
     def __init__(self, left, right):
         super().__init__("&&", left, right)
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Prefix(Expression):
     operator:str
     right:Expression
@@ -127,7 +127,7 @@ class Not(Prefix):
     def __init__(self, right):
         super().__init__("!", right)
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Symbol(Expression):
     name:str
 
@@ -140,7 +140,7 @@ class Symbol(Expression):
     def cost(self):
         return 1
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Constant(Expression):
     value:object
 
@@ -153,7 +153,7 @@ class Constant(Expression):
     def cost(self):
         return 1
 
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Variable(Expression):
     identifier:object
     signature:Expression = field(default_factory=Expression)
