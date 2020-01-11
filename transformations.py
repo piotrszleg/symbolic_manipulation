@@ -1,12 +1,21 @@
 from basic_expressions import *
-from transformation import Transformation
+from transformation import ParsedTransformation
+from itertools import starmap
 
-transformations=[
-    Transformation(Not(Not(Variable(1))), Variable(1)),
-    Transformation(Not(Or(Variable(1), Variable(2))), And(Not(Variable(1)), Not(Variable(2)))),
-    Transformation(Not(And(Variable(1), Variable(2))), Or(Not(Variable(1)), Not(Variable(2)))),
-    Transformation(And(Variable(1), Variable(1)), Variable(1)),
-    Transformation(Or(Variable(1), Variable(1)), Variable(1)),
-    Transformation(Not(Constant(True)), Constant(False)),
-    Transformation(Not(Constant(False)), Constant(True))
-]
+transformations=list(starmap(ParsedTransformation, [
+    ("!!$a", "$a"),
+    ("!($a&&$b)", "(!$a)||(!$b)"),
+    ("!($a||$b)", "(!$a)&&(!$b)"),
+    ("$a&&$a", "$a"),
+    ("$a||$a", "$a"),
+    ("!false", "true"),
+    ("!true", "false"),
+    ("true||$a", "true"),
+    ("$a||true", "true"),
+    ("false&&$a", "false"),
+    ("$a&&false", "false"),
+    ("false||$a", "$a"),
+    ("$a||false", "$a"),
+    ("true&&$a", "$a"),
+    ("$a&&true", "$a")
+]))
