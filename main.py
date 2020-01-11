@@ -29,8 +29,7 @@ class Expression:
 
     def simplify(self, transformations, max_depth=10):
         paths=sorteddict()
-        path=[self]
-        self.simplify_recursive(transformations, path, paths, 0, max_depth)
+        self.simplify_recursive(transformations, [self], paths, 0, max_depth)
         return paths
 
     def visit(self, fn):
@@ -56,7 +55,7 @@ class Operator(Expression):
         return True
 
     def matches(self, other, variables):
-        if (not isinstance(other, self.__class__)
+        if (not isinstance(other, Operator)
             or self.operator!=other.operator
             or len(self.operands)!=len(other.operands)):
             return False
@@ -86,20 +85,31 @@ class Operator(Expression):
             result.append(Operator(self.operator, *operands))
         return result
 
-    def simplify_recursive(self, transformations, path, paths, depth, max_depth):
+    def simplify_operands(self, depth, max_depth):
         operands_simplifications=[]
-        for (operand_index, operand) in enumerate(self.operands):
-            operand_paths=sorteddict()
-            operand.simplify_recursive(transformations, [operand], operand_paths, depth, max_depth)
+        for operand in self.operands:
+            operand_paths={}
             operand_paths[operand]=[operand]
+            operand.simplify_recursive(transformations, [], operand_paths, depth, max_depth)
             operands_simplifications.append(operand_paths)
-        for combination in product(*map(methodcaller("items"), operands_simplifications)):
+        return operands_simplifications
+
+    def simplify_recursive(self, transformations, path, paths, depth, max_depth):
+        operands_simplifications=self.simplify_operands(depth, max_depth)
+        # the default map iterator yields keys, but we need key value pairs
+        operands_simplifications_items=map(methodcaller("items"), operands_simplifications)
+        for combination in product(*operands_simplifications_items):
+            # combination is an array of tuples
+            # so here it is splitted into two arrays of first and second tuple elements
             operands_transformed=list(map(itemgetter(0), combination))
             operands_paths=list(map(itemgetter(1), combination))
+            # operands simplifications are written as if each operand was the root
+            # so key and each path element needs to be wrapped in the Operator instance
             key=Operator(self.operator, *operands_transformed)
+            # this avoids infinite recursion
             if key!=self:
                 paths[key]=path[-1:]+self.prepend_each_path_element(operands_paths)
-                key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
+                key.simplify_recursive(transformations, paths[key].copy(), paths, depth+1, max_depth)
         super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
 
     def replace_variables(self, variables):
@@ -185,10 +195,10 @@ transformations=[
     Transformation(Not(Constant(False)), Constant(True))
 ]
 
-# tested=Not(Not(Symbol("x")))
-tested=And(Not(Not(Constant(True))), Symbol("a"))
-print("Input")
-print(tested)
-print("Possible transformations")
-for path in tested.simplify(transformations).values():
-    print(" -> ".join(map(str, path)))
+if __name__ == "__main__":
+    tested=Not(Not(Not(Constant(True))))
+    print("Input")
+    print(tested)
+    print("Possible transformations")
+    for path in tested.simplify(transformations).values():
+        print(" -> ".join(map(str, path)))
