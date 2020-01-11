@@ -1,6 +1,8 @@
-from itertools import zip_longest
+from itertools import zip_longest, product, accumulate
 from blist import sorteddict
 from dataclasses import dataclass, field
+from operator import methodcaller, itemgetter, add
+from functools import reduce
 
 class Expression:
     def matches(self, other, variables):
@@ -37,96 +39,87 @@ class Expression:
     def replace_variables(self, variables):
         return self
 
-@dataclass(frozen=True)
-class Binary(Expression):
-    operator:str
-    left:Expression
-    right:Expression
+@dataclass(unsafe_hash=True, eq=False)
+class Operator(Expression):
+    def __init__(self, operator, *operands):
+        self.operator=operator
+        self.operands=operands
 
-    def matches(self, other, variables):
-        if not isinstance(other, self.__class__):
+    def __eq__(self, other):
+        if (not isinstance(other, Operator) 
+            or self.operator!=other.operator 
+            or len(self.operands)!=len(other.operands)):
             return False
-        left_matches=self.left.matches(other.left, variables)
-        right_matches=self.right.matches(other.right, variables)
-        return left_matches and right_matches
-
-    def __repr__(self):
-        return "({} {} {})".format(self.left, self.operator, self.right)
-
-    def cost(self):
-        return 1+self.left.cost()+self.right.cost()
-    
-    def prepend_each_path_element(self, left_path, right_path):
-        result=[]
-        if len(left_path)<len(right_path):
-            fill=left_path[-1]
-        else:
-            fill=right_path[-1]
-        for (left_element, right_element) in zip_longest(left_path, right_path, fillvalue=fill):
-            result.append(self.__class__(left_element, right_element))
-        return result
-
-    def simplify_recursive(self, transformations, path, paths, depth, max_depth):
-        left_paths=sorteddict()
-        self.left.simplify_recursive(transformations, [self.left], left_paths, depth, max_depth)
-        left_paths[self.left]=[self.left]
-        right_paths=sorteddict()
-        self.right.simplify_recursive(transformations, [self.right], right_paths, depth, max_depth)
-        right_paths[self.right]=[self.right]
-        for (left_transformed, left_path) in left_paths.items():
-            for (right_transformed, right_path) in right_paths.items():
-                if not(left_transformed==self.left and right_transformed==self.right):
-                    key=self.__class__(left_transformed, right_transformed)
-                    paths[key]=path[:-1]+self.prepend_each_path_element(left_path, right_path)
-                    key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
-        super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
-
-    def replace_variables(self, variables):
-        return self.__class__(self.left.replace_variables(variables), self.right.replace_variables(variables))
-
-class Or(Binary):
-    def __init__(self, left, right):
-        super().__init__("||", left, right)
-
-class And(Binary):
-    def __init__(self, left, right):
-        super().__init__("&&", left, right)
-
-@dataclass(frozen=True)
-class Prefix(Expression):
-    operator:str
-    right:Expression
+        for (self_operand, other_operand) in zip(self.operands, other.operands):
+            if self_operand!=other_operand:
+                return False
+        return True
 
     def matches(self, other, variables):
-        return isinstance(other, self.__class__) and self.right.matches(other.right, variables)
+        if (not isinstance(other, self.__class__)
+            or self.operator!=other.operator
+            or len(self.operands)!=len(other.operands)):
+            return False
+        for (self_operand, other_operand) in zip(self.operands, other.operands):
+            if not self_operand.matches(other_operand, variables):
+                return False
+        return True
 
     def __repr__(self):
-        return f"{self.operator}{self.right}"
+        if len(self.operands)==1:
+            return f"{self.operator+str(self.operands[0])}"
+        else:
+            return f"({self.operator.join(map(str, self.operands))})"
 
     def cost(self):
-        return 1+self.right.cost()
+        return 1+reduce(add, map(methodcaller("cost"), self.operands))
 
-    def prepend_each_path_element(self, right_path):
+    def prepend_each_path_element(self, paths):
         result=[]
-        for right_element in right_path:
-            result.append(self.__class__(right_element))
+        for i in range(0, max(map(len, paths), default=0)):
+            operands=[]
+            for path in paths:
+                if i<len(path):
+                    operands.append(path[i])
+                else:
+                    operands.append(path[-1])
+            result.append(Operator(self.operator, *operands))
         return result
 
     def simplify_recursive(self, transformations, path, paths, depth, max_depth):
-        right_paths=sorteddict()
-        self.right.simplify_recursive(transformations, [self.right], right_paths, depth, max_depth)
-        for (right_transformed, right_path) in right_paths.items():
-            key=self.__class__(right_transformed)
-            paths[key]=path[:-1]+self.prepend_each_path_element(right_path)
-            key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
+        operands_simplifications=[]
+        for (operand_index, operand) in enumerate(self.operands):
+            operand_paths=sorteddict()
+            operand.simplify_recursive(transformations, [operand], operand_paths, depth, max_depth)
+            operand_paths[operand]=[operand]
+            operands_simplifications.append(operand_paths)
+        for combination in product(*map(methodcaller("items"), operands_simplifications)):
+            operands_transformed=list(map(itemgetter(0), combination))
+            operands_paths=list(map(itemgetter(1), combination))
+            key=Operator(self.operator, *operands_transformed)
+            if key!=self:
+                paths[key]=path[-1:]+self.prepend_each_path_element(operands_paths)
+                key.simplify_recursive(transformations, paths[key].copy(), paths, depth, max_depth)
         super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
 
     def replace_variables(self, variables):
-        return self.__class__(self.right.replace_variables(variables))
+        return Operator(self.operator, 
+                              *map(methodcaller("replace_variables", variables), self.operands))
 
-class Not(Prefix):
-    def __init__(self, right):
-        super().__init__("!", right)
+class Or(Operator):
+    def __init__(self, *operands):
+        self.operator="||"
+        self.operands=operands
+
+class And(Operator):
+    def __init__(self, *operands):
+        self.operator="&&"
+        self.operands=operands
+
+class Not(Operator):
+    def __init__(self, operand):
+        self.operator="!"
+        self.operands=[operand]
 
 @dataclass(frozen=True)
 class Symbol(Expression):
@@ -171,21 +164,6 @@ class Variable(Expression):
     def __repr__(self):
         return "$"+repr(self.identifier)
 
-def DeMorgan1(expression):
-    return And(Not(expression.right.left), Not(expression.right.right))
-
-def DeMorgan2(expression):
-    return Or(Not(expression.right.left), Not(expression.right.right))
-
-def DoubleNegation(expression):
-    return expression.right.right
-
-def TakeLeft(expression):
-    return expression.left
-
-def TakeRight(expression):
-    return expression.right
-
 class Transformation:
     def __init__(self, input, output):
         self.input=input
@@ -208,7 +186,7 @@ transformations=[
 ]
 
 # tested=Not(Not(Symbol("x")))
-tested=Not(Not(Not(And(Constant(True), Constant(True)))))
+tested=And(Not(Not(Constant(True))), Symbol("a"))
 print("Input")
 print(tested)
 print("Possible transformations")
