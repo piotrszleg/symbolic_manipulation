@@ -1,8 +1,8 @@
 from basic_expressions import *
 from transformation import ParsedTransformation
 from itertools import starmap
-
-transformations=list(starmap(ParsedTransformation, [
+ 
+formulas=[
     ("!!$a", "$a"),
     ("!($a&&$b)", "(!$a)||(!$b)"),
     ("!($a||$b)", "(!$a)&&(!$b)"),
@@ -18,4 +18,8 @@ transformations=list(starmap(ParsedTransformation, [
     ("$a||false", "$a"),
     ("true&&$a", "$a"),
     ("$a&&true", "$a")
-]))
+]
+# formulas_inverted=map(reversed, formulas)
+
+transformations=(list(starmap(ParsedTransformation, formulas))
+)#                +list(starmap(ParsedTransformation, formulas_inverted)))

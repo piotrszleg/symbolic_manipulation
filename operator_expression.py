@@ -75,7 +75,7 @@ class Operator(Expression):
             key=Operator(self.operator, *operands_transformed)
             # this avoids infinite recursion
             if key!=self:
-                paths[key]=path[-1:]+self.prepend_each_path_element(operands_paths)
+                paths[key]=path+self.prepend_each_path_element(operands_paths)
                 key.simplify_recursive(transformations, paths[key].copy(), paths, depth+1, max_depth)
         super().simplify_recursive(transformations, path.copy(), paths, depth, max_depth)
 
