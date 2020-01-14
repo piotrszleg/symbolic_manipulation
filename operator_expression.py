@@ -51,7 +51,7 @@ class Operator(Expression):
                     operands.append(path[-1])
             result.append(Operator(self.operator, *operands))
         return result
-
+        
     def simplify_operands(self, transformations, depth, max_depth):
         operands_simplifications=[]
         for operand in self.operands:
