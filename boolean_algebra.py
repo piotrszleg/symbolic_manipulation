@@ -19,9 +19,6 @@ formulas=[
     ("false||$a", "$a"),
     ("$a||false", "$a"),
     ("true&&$a", "$a"),
-    ("$a&&true", "$a")
+    ("$a&&true", "$a"),
 ]
-# formulas_inverted=map(reversed, formulas)
-
-transformations=(list(starmap(ParsedTransformation, formulas))
-)#                +list(starmap(ParsedTransformation, formulas_inverted)))
+transformations=(list(starmap(ParsedTransformation, formulas)))

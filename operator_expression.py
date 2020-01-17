@@ -1,6 +1,5 @@
 from expression import Expression
 from itertools import zip_longest, product, accumulate
-from blist import sorteddict
 from dataclasses import dataclass, field
 from operator import methodcaller, itemgetter, add
 from functools import reduce
@@ -51,7 +50,7 @@ class Operator(Expression):
                     operands.append(path[-1])
             result.append(Operator(self.operator, *operands))
         return result
-        
+
     def simplify_operands(self, transformations, depth, max_depth):
         operands_simplifications=[]
         for operand in self.operands:

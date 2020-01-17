@@ -1,5 +1,5 @@
 from basic_expressions import *
-from transformations import transformations
+from boolean_algebra import transformations
 from parser import parser
 
 if __name__ == "__main__":
@@ -9,5 +9,5 @@ if __name__ == "__main__":
     print("Input:")
     print(expression)
     print("Possible transformations:")
-    for path in expression.simplify(transformations).values():
-        print(" -> ".join(map(str, path)))
+    for path in expression.simplify(transformations, 100).values():
+        print(" <=> ".join(map(str, path)))

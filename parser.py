@@ -17,7 +17,8 @@ class TreeToExpression(Transformer):
     true            = lambda self, _: Constant(True)
     false           = lambda self, _: Constant(False)
 
-parser = Lark(r"""
+def make_parser(prefix_operators, binary_operators):
+    parser_program=r"""
     expression: "(" expression ")"
               | ("true" | "True")   -> true
               | ("false" | "False") -> false
@@ -31,10 +32,14 @@ parser = Lark(r"""
     symbol: NAME
     variable: "$" NAME
     NAME: /\w+/
-    PREFIX_OPERATOR: "!"
-    BINARY_OPERATOR: /&&|\|\|/
+    PREFIX_OPERATOR: /{}/
+    BINARY_OPERATOR: /{}/
     %import common.SIGNED_NUMBER
     %import common.WS
     %ignore WS
 
-    """, start='expression', parser="lalr", transformer=TreeToExpression())
+    """.format("|".join(prefix_operators), "|".join(binary_operators))
+
+    return Lark(parser_program, start='expression', parser="lalr", transformer=TreeToExpression())
+
+parser=make_parser(["!"], ["&&", "\|\|", "->", "#", ","])
